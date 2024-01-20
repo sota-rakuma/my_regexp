@@ -1,5 +1,5 @@
 /*
-literal: [a-zA-z0-9\.]
+char: [a-zA-z0-9\.]
 quantifier: [*, ?]
 selector: [|]
 */
