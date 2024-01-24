@@ -4,20 +4,28 @@ quantifier: [*, ?]
 selector: [|]
 */
 
-#[derive(PartialEq, Eq, Debug)]
+pub type Char = char;
+pub type Quantifier = char;
+
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Token {
     Char(char),
+    Space(char),
     Quantifier(char),
     Selector,
+    Lparen,
+    Rparen,
 }
 
 fn get_token(raw_token: char) -> Token {
-    if raw_token == '*' || raw_token == '?' {
-        return Token::Quantifier(raw_token);
-    } else if raw_token == '|' {
-        return  Token::Selector;
+    match raw_token {
+        c if c == '*' || c == '?' => Token::Quantifier(c),
+        c if c == '|' => Token::Selector,
+        c if c == '(' => Token::Lparen,
+        c if c == ')' => Token::Rparen,
+        c if c.is_whitespace() => Token::Space(c),
+        c => Token::Char(c)
     }
-    Token::Char(raw_token)
 }
 
 pub fn get_tokens(raw: &str) -> Vec<Token> {
@@ -30,46 +38,50 @@ pub fn get_tokens(raw: &str) -> Vec<Token> {
 
 #[cfg(test)]
 mod test {
-    use crate::lexer::{Token, get_tokens};
-
-    fn create_ans(s: &str) -> Vec<Token> {
-        s.chars().map(|ch| {
-            if ch == '*' || ch == '?' {
-                return Token::Quantifier(ch);
-            } else if ch == '|' {
-                return  Token::Selector;
-            }
-            Token::Char(ch)
-        }).collect()
-    }
+    use crate::lexer::{get_tokens, Token};
 
     #[test]
     fn valid_string_only_with_literal_get_tokens() {
-        let raws = vec!["a", "abc", "abc 12"];
+        let raw = "a";
+        let expect = vec![Token::Char('a')];
+        let actual = get_tokens(raw);
+        assert_eq!(expect, actual);
 
+        let raw = "ab";
+        let expect = vec![Token::Char('a'), Token::Char('b')];
+        let actual = get_tokens(raw);
+        assert_eq!(expect, actual);
 
-        for raw in raws {
-            let expect = create_ans(raw);
-            let actual = get_tokens(raw);
-            assert_eq!(expect, actual);
-        }
-    }
-
-    #[test]
-    fn valid_string_with_quauntifier_get_tokens() {
         let raw = "a*a";
-        let expect = create_ans(raw);
+        let expect = vec![Token::Char('a'), Token::Quantifier('*'), Token::Char('a')];
         let actual = get_tokens(raw);
         assert_eq!(expect, actual);
 
         let raw = "a*";
-        let expect = create_ans(raw);
+        let expect = vec![Token::Char('a'), Token::Quantifier('*')];
         let actual = get_tokens(raw);
         assert_eq!(expect, actual);
 
         let raw = "*a";
-        let expect = create_ans(raw);
+        let expect = vec![Token::Quantifier('*'), Token::Char('a')];
+        let actual = get_tokens(raw);
+        assert_eq!(expect, actual);
+
+        let raw = "(ab|c )*d?";
+        let expect = vec![
+            Token::Lparen,
+            Token::Char('a'),
+            Token::Char('b'),
+            Token::Selector,
+            Token::Char('c'),
+            Token::Space(' '),
+            Token::Rparen,
+            Token::Quantifier('*'), 
+            Token::Char('d'),
+            Token::Quantifier('?')
+        ];
         let actual = get_tokens(raw);
         assert_eq!(expect, actual);
     }
+
 }
