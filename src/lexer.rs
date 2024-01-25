@@ -10,7 +10,6 @@ pub type Quantifier = char;
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Token {
     Char(char),
-    Space(char),
     Quantifier(char),
     Selector,
     Lparen,
@@ -23,7 +22,6 @@ fn get_token(raw_token: char) -> Token {
         c if c == '|' => Token::Selector,
         c if c == '(' => Token::Lparen,
         c if c == ')' => Token::Rparen,
-        c if c.is_whitespace() => Token::Space(c),
         c => Token::Char(c)
     }
 }
@@ -74,7 +72,7 @@ mod test {
             Token::Char('b'),
             Token::Selector,
             Token::Char('c'),
-            Token::Space(' '),
+            Token::Char(' '),
             Token::Rparen,
             Token::Quantifier('*'), 
             Token::Char('d'),
