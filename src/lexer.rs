@@ -1,5 +1,5 @@
 /*
-char: [a-zA-z0-9\.]
+char: [a-zA-z0-9\s\.]
 quantifier: [*, ?]
 selector: [|]
 */
@@ -14,6 +14,17 @@ pub enum Token {
     Selector,
     Lparen,
     Rparen,
+}
+
+impl Token {
+    pub fn to_char(&self) -> char {
+        match *self {
+            Token::Char(c) | Token::Quantifier(c) => c,
+            Token::Selector => '|',
+            Token::Lparen => '(',
+            Token::Rparen => ')',
+        }
+    }
 }
 
 fn get_token(raw_token: char) -> Token {

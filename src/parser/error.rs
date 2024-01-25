@@ -1,7 +1,7 @@
 use std::{error::Error, fmt::Display};
 use crate::parser::Token;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct ParseRegexpError {
     cause: Option<Token>,
     idx: usize
