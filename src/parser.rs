@@ -109,7 +109,7 @@ impl LL0Parser {
                 self.next_idx += 1;
                 regexp
             },
-            c => Err(ParseRegexpError::new(c, self.next_idx)),
+            cause => Err(ParseRegexpError::new(cause, self.next_idx)),
         }
     }
 
@@ -123,7 +123,7 @@ impl LL0Parser {
 }
 
 impl Parser for LL0Parser {
-    // <regex> ::= <alt>
+    // <regex> ::= <alt> (本来は <alt> | ε) 
     fn parse(&mut self, tokens: &Vec<Token>) -> ParserResult<Regexp> {
         let alt = self.parse_alt(tokens)?;
         if let Some(c) = self.get_next_token(tokens) {
