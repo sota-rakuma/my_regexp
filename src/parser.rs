@@ -45,17 +45,13 @@ pub trait Parser {
     fn parse(&mut self, tokens: &Vec<Token>) -> ParserResult<Regexp>;
 }
 
-pub struct LL1Parser {
+pub struct LL0Parser {
     next_idx: usize,
 }
 
-// 先読みがいるかどうか考える
-// 今のままだと、エラーがBaseでしか出せない
-// 多分今のままだと、a**みたいなのを受容してしまう気がする。
-// ↑しないわ。baseでエラー吐く。
-impl LL1Parser {
-    pub fn new() -> LL1Parser {
-        LL1Parser { next_idx: 0 }
+impl LL0Parser {
+    pub fn new() -> LL0Parser {
+        LL0Parser { next_idx: 0 }
     }
 
     // <alt> ::= <concat> | <concat> "|" <alt> [$, ")"]
@@ -78,7 +74,6 @@ impl LL1Parser {
         match self.get_next_token(tokens) {
             Some(Token::Char(_)) | Some(Token::Lparen) => {
                 let tail = self.parse_concat(tokens)?;
-                // self.next_idx += 1;
                 Ok(Concat{val: factor, tail: Some(Box::new(tail)) })
             },
             _ => Ok(Concat{val: factor, tail: None})
@@ -127,7 +122,7 @@ impl LL1Parser {
     }
 }
 
-impl Parser for LL1Parser {
+impl Parser for LL0Parser {
     // <regex> ::= <alt>
     fn parse(&mut self, tokens: &Vec<Token>) -> ParserResult<Regexp> {
         let alt = self.parse_alt(tokens)?;
@@ -143,107 +138,107 @@ impl Parser for LL1Parser {
 mod test {
     mod invalid {
         use crate::lexer::Token;
-        use super::super::{error::ParseRegexpError, LL1Parser, Parser};
+        use super::super::{error::ParseRegexpError, LL0Parser, Parser};
 
         #[test]
         fn start_with_quantifier() {
             let tokens = vec![Token::Quantifier('*')];
-            let actual = LL1Parser::new().parse(&tokens);
+            let actual = LL0Parser::new().parse(&tokens);
             assert_eq!(actual.unwrap_err(), ParseRegexpError::new(Some(tokens[0]), 0usize));
             
             let tokens = vec![Token::Quantifier('*'), Token::Char('c')];
-            let actual = LL1Parser::new().parse(&tokens);
+            let actual = LL0Parser::new().parse(&tokens);
             assert_eq!(actual.unwrap_err(), ParseRegexpError::new(Some(tokens[0]), 0usize));
 
             let tokens = vec![Token::Lparen, Token::Quantifier('*'), Token::Rparen];
-            let actual = LL1Parser::new().parse(&tokens);
+            let actual = LL0Parser::new().parse(&tokens);
             assert_eq!(actual.unwrap_err(), ParseRegexpError::new(Some(tokens[1]), 1usize));
         }
 
         #[test]
         fn token_before_quantifier_is_not_char() {
             let tokens = vec![Token::Char('a'), Token::Quantifier('*'), Token::Quantifier('*')];
-            let actual = LL1Parser::new().parse(&tokens);
+            let actual = LL0Parser::new().parse(&tokens);
             assert_eq!(actual.unwrap_err(), ParseRegexpError::new(Some(tokens[2]), 2usize));
 
             let tokens = vec![Token::Char('a'), Token::Quantifier('|'), Token::Quantifier('*')];
-            let actual = LL1Parser::new().parse(&tokens);
+            let actual = LL0Parser::new().parse(&tokens);
             assert_eq!(actual.unwrap_err(), ParseRegexpError::new(Some(tokens[2]), 2usize));
 
             let tokens = vec![Token::Char('a'), Token::Quantifier('('), Token::Quantifier('*')];
-            let actual = LL1Parser::new().parse(&tokens);
+            let actual = LL0Parser::new().parse(&tokens);
             assert_eq!(actual.unwrap_err(), ParseRegexpError::new(Some(tokens[2]), 2usize));
 
             let tokens = vec![Token::Char('a'), Token::Char('a'), Token::Quantifier('?'), Token::Char('a'), Token::Quantifier('?'), Token::Quantifier('*')];
-            let actual = LL1Parser::new().parse(&tokens);
+            let actual = LL0Parser::new().parse(&tokens);
             assert_eq!(actual.unwrap_err(), ParseRegexpError::new(Some(tokens[5]), 5usize));
         }
 
         #[test]
         fn start_with_selector() {
             let tokens = vec![Token::Selector];
-            let actual = LL1Parser::new().parse(&tokens);
+            let actual = LL0Parser::new().parse(&tokens);
             assert_eq!(actual.unwrap_err(), ParseRegexpError::new(Some(tokens[0]), 0usize));
 
             let tokens = vec![Token::Selector, Token::Char('c')];
-            let actual = LL1Parser::new().parse(&tokens);
+            let actual = LL0Parser::new().parse(&tokens);
             assert_eq!(actual.unwrap_err(), ParseRegexpError::new(Some(tokens[0]), 0usize));
 
             let tokens = vec![Token::Lparen, Token::Quantifier('|'), Token::Rparen];
-            let actual = LL1Parser::new().parse(&tokens);
+            let actual = LL0Parser::new().parse(&tokens);
             assert_eq!(actual.unwrap_err(), ParseRegexpError::new(Some(tokens[1]), 1usize));
         }
 
         #[test]
         fn continuous_selector() {
             let tokens = vec![Token::Char('c'), Token::Selector, Token::Selector];
-            let actual = LL1Parser::new().parse(&tokens);
+            let actual = LL0Parser::new().parse(&tokens);
             assert_eq!(actual.unwrap_err(), ParseRegexpError::new(Some(tokens[2]), 2usize));
 
             let tokens = vec![Token::Char('c'), Token::Selector, Token::Selector, Token::Char('c')];
-            let actual = LL1Parser::new().parse(&tokens);
+            let actual = LL0Parser::new().parse(&tokens);
             assert_eq!(actual.unwrap_err(), ParseRegexpError::new(Some(tokens[2]), 2usize));
         }
 
         #[test]
         fn terminated_by_selector() {
             let tokens = vec![Token::Char('a'), Token::Char('a'), Token::Selector];
-            let actual = LL1Parser::new().parse(&tokens);
+            let actual = LL0Parser::new().parse(&tokens);
             assert_eq!(actual.unwrap_err(), ParseRegexpError::new(None, 3usize));
 
             let tokens = vec![Token::Char('a'), Token::Char('a'), Token::Char('a'), Token::Char('a'), Token::Selector];
-            let actual = LL1Parser::new().parse(&tokens);
+            let actual = LL0Parser::new().parse(&tokens);
             assert_eq!(actual.unwrap_err(), ParseRegexpError::new(None, 5usize));
 
             let tokens = vec![Token::Lparen, Token::Char('a'), Token::Quantifier('?'), Token::Rparen, Token::Selector];
-            let actual = LL1Parser::new().parse(&tokens);
+            let actual = LL0Parser::new().parse(&tokens);
             assert_eq!(actual.unwrap_err(), ParseRegexpError::new(None, 5usize));
         }
 
         #[test]
         fn not_grouped() {
             let tokens = vec![Token::Rparen];
-            let actual = LL1Parser::new().parse(&tokens);
+            let actual = LL0Parser::new().parse(&tokens);
             assert_eq!(actual.unwrap_err(), ParseRegexpError::new(Some(Token::Rparen), 0usize));
 
             let tokens = vec![Token::Char('c'), Token::Rparen];
-            let actual = LL1Parser::new().parse(&tokens);
+            let actual = LL0Parser::new().parse(&tokens);
             assert_eq!(actual.unwrap_err(), ParseRegexpError::new(Some(Token::Rparen), 1usize));
 
             let tokens = vec![Token::Lparen];
-            let actual = LL1Parser::new().parse(&tokens);
+            let actual = LL0Parser::new().parse(&tokens);
             assert_eq!(actual.unwrap_err(), ParseRegexpError::new(None, 1usize));
 
             let tokens = vec![Token::Lparen, Token::Char('c')];
-            let actual = LL1Parser::new().parse(&tokens);
+            let actual = LL0Parser::new().parse(&tokens);
             assert_eq!(actual.unwrap_err(), ParseRegexpError::new(None, 2usize));
 
             let tokens = vec![Token::Lparen, Token::Char('a'), Token::Rparen, Token::Rparen];
-            let actual = LL1Parser::new().parse(&tokens);
+            let actual = LL0Parser::new().parse(&tokens);
             assert_eq!(actual.unwrap_err(), ParseRegexpError::new(Some(Token::Rparen), 3usize));
 
             let tokens = vec![Token::Lparen, Token::Lparen, Token::Char('a'), Token::Rparen];
-            let actual = LL1Parser::new().parse(&tokens);
+            let actual = LL0Parser::new().parse(&tokens);
             assert_eq!(actual.unwrap_err(), ParseRegexpError::new(None, 4usize));
         }
     }
@@ -251,7 +246,7 @@ mod test {
     mod valid {
         use std::collections::HashMap;
 
-        use crate::{lexer::Token, parser::{Alt, Base, Concat, Factor, LL1Parser, Parser, Regexp}};
+        use crate::{lexer::Token, parser::{Alt, Base, Concat, Factor, LL0Parser, Parser, Regexp}};
 
         fn wrap_regexp(val: Alt) -> Regexp {
             Regexp { val }
@@ -299,7 +294,7 @@ mod test {
                         None), 
                 None), 
             );
-            let actual = LL1Parser::new().parse(&tokens);
+            let actual = LL0Parser::new().parse(&tokens);
             assert_eq!(actual, Ok(expected));
 
 
@@ -313,7 +308,7 @@ mod test {
             .collect();
             let expected_concat = create_concat(expected_factors);
             let expected = Regexp { val: (Alt { val:(expected_concat, None) }) };
-            let actual = LL1Parser::new().parse(&tokens);
+            let actual = LL0Parser::new().parse(&tokens);
             assert_eq!(actual, Ok(expected));
         }
 
@@ -347,7 +342,7 @@ mod test {
                     ),
                 }
             };
-            let actual = LL1Parser::new().parse(&tokens);
+            let actual = LL0Parser::new().parse(&tokens);
             assert_eq!(actual, Ok(expected));
         }
 
@@ -471,7 +466,7 @@ mod test {
             };
 
             let expected = Regexp{val: alt};
-            let actual = LL1Parser::new().parse(&tokens);
+            let actual = LL0Parser::new().parse(&tokens);
             assert_eq!(actual, Ok(expected));
         }
     }
