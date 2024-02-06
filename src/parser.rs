@@ -13,11 +13,12 @@ pub struct Regexp {
     pub val: Alt
 }
 
-// <alt> ::= <concat> | <concat> "|" <alt>
+// <alt> ::= ε | <concat> | <concat> "|" <alt>
 // <alt> ::= (<concat>("|" <alt>)?)?
 #[derive(Debug, PartialEq, Eq)]
 pub struct Alt {
-    pub val: (Concat, Option<Box<Alt>>)
+    pub val: Option<Concat>,
+    pub tail: Option<Box<Alt>>,
 }
 
 // <concat> ::= <factor> <concat> | <factor>
@@ -54,17 +55,23 @@ impl LL0Parser {
         LL0Parser { next_idx: 0 }
     }
 
-    // <alt> ::= <concat> | <concat> "|" <alt> [$, ")"]
-    // <alt> ::= <concat>("|" <alt>)?
+    // <alt> ::= ε | <concat> | <alt> "|" <alt>
+
+    // <alt> ::= ε | <concat><alt'>
+    // <alt'> ::= ε | "|" <alt><alt'>
     fn parse_alt(&mut self, tokens: &Vec<Token>) -> ParserResult<Alt> {
-        let alt = self.parse_concat(tokens)?;
+        let concat = match self.get_next_token(tokens) {
+            None | Some(Token::Selector) | Some(Token::Rparen) => None,
+            Some(_c) =>  Some(self.parse_concat(tokens)?)
+        };
+
         match self.get_next_token(tokens) {
             Some(Token::Selector) => {
                 self.next_idx += 1;
                 let tail = self.parse_alt(tokens)?;
-                Ok(Alt { val: (alt, Some(Box::new(tail)))})
+                Ok(Alt { val: concat, tail: Some(Box::new(tail)) })
             },
-            _ => Ok(Alt{ val: (alt, None)}),
+            _ => Ok(Alt{ val: concat, tail: None }),
         }
     }
 
@@ -123,7 +130,6 @@ impl LL0Parser {
 }
 
 impl Parser for LL0Parser {
-    // <regex> ::= <alt> (本来は <alt> | ε) 
     fn parse(&mut self, tokens: &Vec<Token>) -> ParserResult<Regexp> {
         let alt = self.parse_alt(tokens)?;
         if let Some(c) = self.get_next_token(tokens) {
@@ -133,7 +139,6 @@ impl Parser for LL0Parser {
     }
 }
 
-// テスト書いたらリファクタリングしよ。おやすみ
 #[cfg(test)]
 mod test {
     mod invalid {
@@ -175,47 +180,6 @@ mod test {
         }
 
         #[test]
-        fn start_with_selector() {
-            let tokens = vec![Token::Selector];
-            let actual = LL0Parser::new().parse(&tokens);
-            assert_eq!(actual.unwrap_err(), ParseRegexpError::new(Some(tokens[0]), 0usize));
-
-            let tokens = vec![Token::Selector, Token::Char('c')];
-            let actual = LL0Parser::new().parse(&tokens);
-            assert_eq!(actual.unwrap_err(), ParseRegexpError::new(Some(tokens[0]), 0usize));
-
-            let tokens = vec![Token::Lparen, Token::Quantifier('|'), Token::Rparen];
-            let actual = LL0Parser::new().parse(&tokens);
-            assert_eq!(actual.unwrap_err(), ParseRegexpError::new(Some(tokens[1]), 1usize));
-        }
-
-        #[test]
-        fn continuous_selector() {
-            let tokens = vec![Token::Char('c'), Token::Selector, Token::Selector];
-            let actual = LL0Parser::new().parse(&tokens);
-            assert_eq!(actual.unwrap_err(), ParseRegexpError::new(Some(tokens[2]), 2usize));
-
-            let tokens = vec![Token::Char('c'), Token::Selector, Token::Selector, Token::Char('c')];
-            let actual = LL0Parser::new().parse(&tokens);
-            assert_eq!(actual.unwrap_err(), ParseRegexpError::new(Some(tokens[2]), 2usize));
-        }
-
-        #[test]
-        fn terminated_by_selector() {
-            let tokens = vec![Token::Char('a'), Token::Char('a'), Token::Selector];
-            let actual = LL0Parser::new().parse(&tokens);
-            assert_eq!(actual.unwrap_err(), ParseRegexpError::new(None, 3usize));
-
-            let tokens = vec![Token::Char('a'), Token::Char('a'), Token::Char('a'), Token::Char('a'), Token::Selector];
-            let actual = LL0Parser::new().parse(&tokens);
-            assert_eq!(actual.unwrap_err(), ParseRegexpError::new(None, 5usize));
-
-            let tokens = vec![Token::Lparen, Token::Char('a'), Token::Quantifier('*'), Token::Rparen, Token::Selector];
-            let actual = LL0Parser::new().parse(&tokens);
-            assert_eq!(actual.unwrap_err(), ParseRegexpError::new(None, 5usize));
-        }
-
-        #[test]
         fn not_grouped() {
             let tokens = vec![Token::Rparen];
             let actual = LL0Parser::new().parse(&tokens);
@@ -252,12 +216,11 @@ mod test {
             Regexp { val }
         }
 
-        fn wrap_alt(val: Concat, tail: Option<Alt>) -> Alt {
+        fn wrap_alt(val: Option<Concat>, tail: Option<Alt>) -> Alt {
             match tail {
-                Some(v) => Alt { val: (val, Some(Box::new(v))) },
-                None => Alt {val: (val, None)}
+                Some(v) => Alt { val, tail: Some(Box::new(v)) },
+                None => Alt {val, tail: None}
             }
-            
         }
 
         fn wrap_concat(val: Factor, tail: Option<Concat>) -> Concat {
@@ -285,13 +248,26 @@ mod test {
         }
 
         #[test]
+        fn empty() {
+            let tokens = vec![];
+            let expected = wrap_regexp(
+                wrap_alt(
+                    None,
+                    None
+                ), 
+            );
+            let actual = LL0Parser::new().parse(&tokens);
+            assert_eq!(actual, Ok(expected));
+        }
+
+        #[test]
         fn only_char() {
             let tokens = vec![Token::Char('a')];
             let expected = wrap_regexp(
                 wrap_alt(
-                    wrap_concat(
+                    Some(wrap_concat(
                         wrap_factor(Base::Char(tokens[0]), None), 
-                        None), 
+                        None)), 
                 None), 
             );
             let actual = LL0Parser::new().parse(&tokens);
@@ -307,7 +283,111 @@ mod test {
             })
             .collect();
             let expected_concat = create_concat(expected_factors);
-            let expected = Regexp { val: (Alt { val:(expected_concat, None) }) };
+            let expected = Regexp { val: (Alt { val:Some(expected_concat), tail: None }) };
+            let actual = LL0Parser::new().parse(&tokens);
+            assert_eq!(actual, Ok(expected));
+        }
+
+        #[test]
+        fn start_with_selector() {
+            let tokens = vec![Token::Selector];
+            let expected = wrap_regexp(
+                wrap_alt(
+                    None,
+                    Some(Alt { val: None, tail: None })
+                ), 
+            );
+            let actual = LL0Parser::new().parse(&tokens);
+            assert_eq!(actual, Ok(expected));
+
+            let tokens = vec![Token::Selector, Token::Char('c')];
+            let expected = wrap_regexp(
+                wrap_alt(
+                    None,
+                    Some(
+                        wrap_alt(
+                            Some(wrap_concat(
+                                wrap_factor(Base::Char(Token::Char('c')), None), 
+                                None)
+                            ), 
+                            None,
+                        )
+                    ),
+                ), 
+            );
+            let actual = LL0Parser::new().parse(&tokens);
+            assert_eq!(actual, Ok(expected));
+
+            let tokens = vec![Token::Lparen, Token::Selector, Token::Rparen];
+            let expected = wrap_regexp(
+                wrap_alt(
+                    Some(wrap_concat(
+                        wrap_factor(
+                            Base::Alt(
+                                Box::new(wrap_alt(
+                                    None,
+                                    Some(Alt { val: None, tail: None })
+                                )),
+                            ),
+                        None),
+                        None
+                    )),
+                    None
+                )
+            );
+            let actual = LL0Parser::new().parse(&tokens);
+            assert_eq!(actual, Ok(expected));
+        }
+
+        #[test]
+        fn continuous_selector() {
+            let tokens = vec![Token::Char('c'), Token::Selector, Token::Selector];
+            let expected = wrap_regexp(
+                wrap_alt(
+                    Some(
+                        wrap_concat(
+                            wrap_factor(Base::Char(Token::Char('c')), None), 
+                            None
+                        )
+                    ),
+                    Some(
+                        wrap_alt(
+                            None, 
+                            Some(
+                                wrap_alt(None, None)
+                            )
+                        )
+                    )
+                ), 
+            );
+            let actual = LL0Parser::new().parse(&tokens);
+            assert_eq!(actual, Ok(expected));
+
+            let tokens = vec![Token::Char('c'), Token::Selector, Token::Selector, Token::Char('c')];
+            let expected = wrap_regexp(
+                wrap_alt(
+                    Some(
+                        wrap_concat(
+                            wrap_factor(Base::Char(Token::Char('c')), None), 
+                            None
+                        )
+                    ),
+                    Some(
+                        wrap_alt(
+                            None,
+                            Some(
+                                wrap_alt(
+                                    Some(wrap_concat(
+                                        wrap_factor(Base::Char(Token::Char('c')), None), 
+                                        None
+                                    )),
+                                    None
+                                ),
+                            ),
+                        )
+                    )
+                )
+            );
             let actual = LL0Parser::new().parse(&tokens);
             assert_eq!(actual, Ok(expected));
         }
@@ -316,21 +396,20 @@ mod test {
         fn group() {
             let tokens = vec![Token::Lparen, Token::Char('a'), Token::Quantifier('*'), Token::Rparen];
             let expected_inner_node = Alt {
-                val: (
-                    Concat{
+                val: Some(Concat{
                         val: Factor { 
                             val: Base::Char(Token::Char('a')), 
                             q: Some(Token::Quantifier('*')),
                         },
                         tail: None,
                     }, 
-                    None
                 ),
+                tail: None
             };
 
             let expected = Regexp {
                 val: Alt {
-                    val: (
+                    val: Some(
                         Concat{
                             val: Factor { 
                                 val: Base::Alt(Box::new(expected_inner_node)), 
@@ -338,8 +417,8 @@ mod test {
                             },
                             tail: None,
                         }, 
-                        None
                     ),
+                    tail: None
                 }
             };
             let actual = LL0Parser::new().parse(&tokens);
@@ -421,34 +500,34 @@ mod test {
 
             //(def|ghi*)
             let innermost = Alt{
-                val: (
+                val: Some(
                     concats.remove(1), 
-                    Some(Box::new(Alt { val: (concats.remove(1), None) }))
-                )
+                ),
+                tail: Some(Box::new(Alt { val: Some(concats.remove(1)), tail: None })),
             };
 
             // (def|ghi*)j*
             let right_alt_in_left_group = Alt{
-                val: (
+                val: Some(
                     Concat{
                         val: Factor { val: Base::Alt(Box::new(innermost)), q: None },
                         tail: Some(Box::new(concats.remove(1)))
                     },
-                    None
                 ),
+                tail: None
             };
 
             // (bc|(def|ghi*)j*)
             let left_group = Alt{
-                val: (
+                val: Some(
                     concats.remove(0),
-                    Some(Box::new(right_alt_in_left_group)),
                 ),
+                tail: Some(Box::new(right_alt_in_left_group)),
             };
 
             // a(bc|(def|ghi*)j*)*|kl.*mn*
             let alt = Alt{
-                val: (
+                val: Some(
                     Concat{
                         val: Factor { val: Base::Char(Token::Char('a')), q: None },
                         tail: Some(
@@ -461,8 +540,8 @@ mod test {
                             })
                         ),
                     },
-                    Some(Box::new(Alt { val: (concats.remove(0), None) })),
-                )
+                ),
+                tail: Some(Box::new(Alt { val: Some(concats.remove(0)), tail: None })),
             };
 
             let expected = Regexp{val: alt};
