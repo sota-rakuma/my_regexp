@@ -29,7 +29,7 @@ impl Token {
 
 fn get_token(raw_token: char) -> Token {
     match raw_token {
-        c if c == '*' || c == '?' => Token::Quantifier(c),
+        c if c == '*' => Token::Quantifier(c),
         c if c == '|' => Token::Selector,
         c if c == '(' => Token::Lparen,
         c if c == ')' => Token::Rparen,
@@ -76,7 +76,7 @@ mod test {
         let actual = get_tokens(raw);
         assert_eq!(expect, actual);
 
-        let raw = "(ab|c )*d?";
+        let raw = "(ab|c )*d*";
         let expect = vec![
             Token::Lparen,
             Token::Char('a'),
@@ -87,7 +87,7 @@ mod test {
             Token::Rparen,
             Token::Quantifier('*'), 
             Token::Char('d'),
-            Token::Quantifier('?')
+            Token::Quantifier('*')
         ];
         let actual = get_tokens(raw);
         assert_eq!(expect, actual);

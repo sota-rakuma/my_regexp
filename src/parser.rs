@@ -169,7 +169,7 @@ mod test {
             let actual = LL0Parser::new().parse(&tokens);
             assert_eq!(actual.unwrap_err(), ParseRegexpError::new(Some(tokens[2]), 2usize));
 
-            let tokens = vec![Token::Char('a'), Token::Char('a'), Token::Quantifier('?'), Token::Char('a'), Token::Quantifier('?'), Token::Quantifier('*')];
+            let tokens = vec![Token::Char('a'), Token::Char('a'), Token::Quantifier('*'), Token::Char('a'), Token::Quantifier('*'), Token::Quantifier('*')];
             let actual = LL0Parser::new().parse(&tokens);
             assert_eq!(actual.unwrap_err(), ParseRegexpError::new(Some(tokens[5]), 5usize));
         }
@@ -210,7 +210,7 @@ mod test {
             let actual = LL0Parser::new().parse(&tokens);
             assert_eq!(actual.unwrap_err(), ParseRegexpError::new(None, 5usize));
 
-            let tokens = vec![Token::Lparen, Token::Char('a'), Token::Quantifier('?'), Token::Rparen, Token::Selector];
+            let tokens = vec![Token::Lparen, Token::Char('a'), Token::Quantifier('*'), Token::Rparen, Token::Selector];
             let actual = LL0Parser::new().parse(&tokens);
             assert_eq!(actual.unwrap_err(), ParseRegexpError::new(None, 5usize));
         }
@@ -314,13 +314,13 @@ mod test {
 
         #[test]
         fn group() {
-            let tokens = vec![Token::Lparen, Token::Char('a'), Token::Quantifier('?'), Token::Rparen];
+            let tokens = vec![Token::Lparen, Token::Char('a'), Token::Quantifier('*'), Token::Rparen];
             let expected_inner_node = Alt {
                 val: (
                     Concat{
                         val: Factor { 
                             val: Base::Char(Token::Char('a')), 
-                            q: Some(Token::Quantifier('?')),
+                            q: Some(Token::Quantifier('*')),
                         },
                         tail: None,
                     }, 
@@ -348,7 +348,7 @@ mod test {
 
         #[test]
         fn complexed_test() {
-            // a(bc|(def|ghi*)j?)*|kl.*mn?
+            // a(bc|(def|ghi*)j*)*|kl.*mn*
             let tokens = vec![
                 Token::Char('a'),
                 Token::Lparen,
@@ -366,7 +366,7 @@ mod test {
                 Token::Quantifier('*'),
                 Token::Rparen,
                 Token::Char('j'),
-                Token::Quantifier('?'),
+                Token::Quantifier('*'),
                 Token::Rparen,
                 Token::Quantifier('*'),
                 Token::Selector,
@@ -376,7 +376,7 @@ mod test {
                 Token::Quantifier('*'),
                 Token::Char('m'),
                 Token::Char('n'),
-                Token::Quantifier('?'),
+                Token::Quantifier('*'),
                 // Token
             ];
             let one_chars = "bcdefghklm".chars().map(|c| {
@@ -392,9 +392,9 @@ mod test {
 
             let with_qs = vec![
                 (Token::Char('i'), Token::Quantifier('*')),
-                (Token::Char('j'), Token::Quantifier('?')),
+                (Token::Char('j'), Token::Quantifier('*')),
                 (Token::Char('.'), Token::Quantifier('*')),
-                (Token::Char('n'), Token::Quantifier('?')),
+                (Token::Char('n'), Token::Quantifier('*')),
             ].into_iter().map(|tuple| {
                 (
                     String::from_iter(vec![tuple.0.to_char(), tuple.1.to_char()]),
@@ -408,13 +408,13 @@ mod test {
 
             let mut factor_map = one_chars.into_iter().chain(with_qs).collect::<HashMap<String, Factor>>();
 
-            //a, bc, def, ghi*, j?, kl.*mn?
+            //a, bc, def, ghi*, j*, kl.*mn*
             let mut concats = vec![
                 vec![factor_map.remove("b").unwrap(), factor_map.remove("c").unwrap()],
                 vec![factor_map.remove("d").unwrap(), factor_map.remove("e").unwrap(), factor_map.remove("f").unwrap()],
                 vec![factor_map.remove("g").unwrap(), factor_map.remove("h").unwrap(), factor_map.remove("i*").unwrap()],
-                vec![factor_map.remove("j?").unwrap()],
-                vec![factor_map.remove("k").unwrap(), factor_map.remove("l").unwrap(), factor_map.remove(".*").unwrap(), factor_map.remove("m").unwrap(), factor_map.remove("n?").unwrap()],
+                vec![factor_map.remove("j*").unwrap()],
+                vec![factor_map.remove("k").unwrap(), factor_map.remove("l").unwrap(), factor_map.remove(".*").unwrap(), factor_map.remove("m").unwrap(), factor_map.remove("n*").unwrap()],
             ].into_iter().map(|v| {
                 create_concat(v)
             }).collect::<Vec<Concat>>();
@@ -427,7 +427,7 @@ mod test {
                 )
             };
 
-            // (def|ghi*)j?
+            // (def|ghi*)j*
             let right_alt_in_left_group = Alt{
                 val: (
                     Concat{
@@ -438,7 +438,7 @@ mod test {
                 ),
             };
 
-            // (bc|(def|ghi*)j?)
+            // (bc|(def|ghi*)j*)
             let left_group = Alt{
                 val: (
                     concats.remove(0),
@@ -446,7 +446,7 @@ mod test {
                 ),
             };
 
-            // a(bc|(def|ghi*)j?)*|kl.*mn?
+            // a(bc|(def|ghi*)j*)*|kl.*mn*
             let alt = Alt{
                 val: (
                     Concat{
