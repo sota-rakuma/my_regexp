@@ -37,7 +37,6 @@ fn only_char_test() {
     let actual = matcher.exec(raw);
     assert_eq!(expected, actual);
 
-    //
     let raw = "a";
     let expected: Vec<String> = vec!["a"].into_iter().map(|v| v.to_string()).collect();
     let actual = matcher.exec(raw);
@@ -494,7 +493,7 @@ fn complex_test() {
     let actual = matcher.exec(raw);
     assert_eq!(expected, actual);
 
-    let raw = "abc"; // not match
+    let raw = "abc";
     let expected: Vec<String> = vec!["", "", "", ""].into_iter().map(|v| v.to_string()).collect();
     let actual = matcher.exec(raw);
     assert_eq!(expected, actual);

@@ -25,14 +25,11 @@ impl BackTracer {
             .collect::<Vec<(bool, Node)>>()
         };
         candidates.sort();
-        // println!("accepted: {:?}", self.nfa.get_accepted_state());
-        // println!("candidates: {:#?}", candidates);
 
         for i in candidates.into_iter() {
             if let Some(v) = self.match_dfs(input,
                 i.1.state(),
                 idx + if i.0 {1} else {0}) {
-                // println!("v: {v}");
                 return Some(v);
             }
         };

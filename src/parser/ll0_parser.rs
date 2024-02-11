@@ -411,7 +411,6 @@ mod test {
                 Token::Char('m'),
                 Token::Char('n'),
                 Token::Quantifier('*'),
-                // Token
             ];
             let one_chars = "bcdefghklm".chars().map(|c| {
                 (

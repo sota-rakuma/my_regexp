@@ -36,23 +36,6 @@ impl<T: Clone> IntoIterator for List<T> {
     }
 }
 
-// impl <T: Clone> FromIterator<T> for List<T> {
-//     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
-//         let mut iter = iter.into_iter();
-//         let mut ret = List::new(None);
-//         let mut last = &ret;
-//         while let Some(v) = iter.next() {
-//             last = match last {
-//                 List::Nil => &List::Cons(v, Box::new(*last)),
-//                 List::Cons(w, next) => {
-//                     &last.append(v)
-//                 }
-//             }
-//         }
-//         ret
-//     }
-// }
-
 impl<T> Iterator for ListIter<T>
 where
     T: Clone,

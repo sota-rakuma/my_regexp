@@ -6,21 +6,6 @@ use super::{NFABuilder, NFA};
 
 pub struct ThompsonWayBuilder {}
 
-// concat: AB(A, B ∈ 正規言語), 初期状態: A, 受理状態: B
-//   update:
-//     遷移表:
-//       Aの受理状態のレコードにBの初期状態の遷移関数を全てくっつけて、Bの初期状態を消す
-// altanative: A | B(A, B ∈ 正規言語), 初期状態: new, 受理状態: new
-//   update:
-//     遷移表:
-//       新たな初期状態Q1からεをトリガーとして、AとBの初期状態に向かう遷移関数を遷移表に加える
-//       AとBの受理状態からεをトリガーとして、新たな受理状態Qnに向かう遷移関数を遷移表に加える
-// kleene closure: A*(A ∈ 正規言語), 初期状態: new, 受理状態: new
-//   update:
-//      遷移表:
-//        新たな初期状態Q1からεをトリガーとして、新たな受理状態Qnに向かう遷移関数を遷移表に加える
-//        新たな初期状態Q1からεをトリガーとして、Aの初期状態に向かう遷移関数を遷移表に加える
-//        Aの受理状態からεをトリガーとして、新たな受理状態Qnに向かう遷移関数を遷移表に加える
 impl NFABuilder for ThompsonWayBuilder {
     fn exec(&self, root: Regexp) -> NFA {
         self.alt(root.val)
