@@ -22,6 +22,37 @@ impl<T> List<T> {
     }
 }
 
+impl<T: Clone> IntoIterator for List<T> {
+    type Item = T;
+    type IntoIter = ListIter<T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        ListIter {
+            current: match self {
+                List::Nil => {None},
+                v => Some(Box::new(v))
+            },
+        }
+    }
+}
+
+// impl <T: Clone> FromIterator<T> for List<T> {
+//     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+//         let mut iter = iter.into_iter();
+//         let mut ret = List::new(None);
+//         let mut last = &ret;
+//         while let Some(v) = iter.next() {
+//             last = match last {
+//                 List::Nil => &List::Cons(v, Box::new(*last)),
+//                 List::Cons(w, next) => {
+//                     &last.append(v)
+//                 }
+//             }
+//         }
+//         ret
+//     }
+// }
+
 impl<T> Iterator for ListIter<T>
 where
     T: Clone,
@@ -66,9 +97,18 @@ impl<T> List<T> {
         list
     }
 
-
     pub fn prepend(self, elem: T) -> List<T> {
         List::Cons(elem, Box::new(self))
+    }
+
+    pub fn last(&self) -> Option<List<T>> {
+        todo!()
+    }
+
+    
+    pub fn append(self, elem: T) -> List<T> {
+        let _ = elem;
+        todo!()
     }
 }
 
@@ -102,5 +142,23 @@ mod test {
 
         let list: List::<i32> = list!();
         assert_eq!(None, list.iter().next());
+    }
+
+    #[test]
+    fn list_into_iter_test() {
+        let list = List::from([1, 2, 3].into_iter());
+        let mut iter = list.into_iter();
+        assert_eq!(Some(1), iter.next());
+        assert_eq!(Some(2), iter.next());
+        assert_eq!(Some(3), iter.next());
+        assert_eq!(None, iter.next());
+
+        let list = list!(1);
+        let mut iter = list.into_iter();
+        assert_eq!(Some(1), iter.next());
+        assert_eq!(None, iter.next());
+
+        let list: List::<i32> = list!();
+        assert_eq!(None, list.into_iter().next());
     }
 }

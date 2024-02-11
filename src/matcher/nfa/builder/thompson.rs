@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{matcher::nfa::{State, Trigger}, parser::{self, Regexp}, state};
+use crate::{list, matcher::nfa::{Key, List, Node, State, Trigger}, parser::{self, Regexp}, state};
 
 use super::{NFABuilder, NFA};
 
@@ -54,13 +54,19 @@ impl ThompsonWayBuilder {
             .chain(other.states)
             .collect(), 
             HashMap::from([
-                ((init_state, 'ε'), nfa.init_state),
-                ((init_state, 'ε'), other.init_state),
-                ((nfa.accepted_state, 'ε'), accepted_state),
-                ((other.accepted_state, 'ε'), other.init_state),
+                ((init_state, 'ε'), List::from([
+                    Node(nfa.init_state, 1), 
+                    Node(other.init_state, 1)
+                ].into_iter())),
+                ((nfa.accepted_state, 'ε'), list!(
+                    Node(accepted_state, 1)
+                )),
+                ((other.accepted_state, 'ε'), list!(
+                    Node(accepted_state, 1)
+                )),
             ]).into_iter()
-            .chain(nfa.transision_table)
-            .chain(other.transision_table)
+            .chain(nfa.transition_table)
+            .chain(other.transition_table)
             .collect(), 
             init_state, 
             accepted_state
@@ -78,18 +84,18 @@ impl ThompsonWayBuilder {
         let accepted_state = right.accepted_state;
 
         let concated_transiions = right
-            .transision_table
+            .transition_table
             .iter()
             .map(|v| {
                 if v.0.0 == right.init_state {
-                    ((left.accepted_state, v.0.1), *v.1)
+                    ((left.accepted_state, v.0.1), v.1.clone())
                 } else {
-                    (*(v.0), *v.1)
+                    (*(v.0), v.1.clone())
                 }
             })
-            .collect::<HashMap<(State, char), State>>();
-        let transision_table = left
-            .transision_table
+            .collect::<HashMap<(State, char), List<Node>>>();
+        let transition_table = left
+            .transition_table
             .into_iter()
             .chain(concated_transiions.into_iter())
             .collect();
@@ -104,7 +110,7 @@ impl ThompsonWayBuilder {
                 .collect::<HashSet<State>>()
             )
             .collect(),
-            transision_table, 
+            transition_table, 
             init_state, 
             accepted_state
         )
@@ -123,12 +129,17 @@ impl ThompsonWayBuilder {
         let accepted_state = state!();
         let child = self.base(ast.val);
         let transition_table = HashMap::from([
-            ((init_state, 'ε'), accepted_state),
-            ((init_state, 'ε'), child.init_state),
-            ((child.accepted_state, 'ε'), accepted_state),
+            ((init_state, 'ε'), List::from([
+                Node(accepted_state, 2), 
+                Node(child.init_state, 1)
+            ].into_iter())),
+            ((child.accepted_state, 'ε'), List::from([
+                Node(accepted_state, 2), 
+                Node(child.init_state, 1)
+            ].into_iter())),
         ]).into_iter()
-        .chain(child.transision_table)
-        .collect::<HashMap<(State, Trigger), State>>();
+        .chain(child.transition_table.into_iter())
+        .collect::<HashMap<(State, Trigger), List<Node>>>();
 
         NFA::new(
             HashSet::from([init_state, accepted_state])
@@ -151,9 +162,20 @@ impl ThompsonWayBuilder {
     fn symbol(&self, c: char) -> NFA {
         let init_state = state!();
         let accepted_state = state!();
+        let table = match c {
+            '.' => {
+                (0x20u32..0x7eu32)
+                .filter_map(char::from_u32)
+                .map(|v| {
+                    ((init_state, v), list!(Node(accepted_state, 1)))
+                })
+                .collect::<HashMap<Key, List<Node>>>()
+            },
+            _ => HashMap::from([((init_state, c), list!(Node(accepted_state, 1)))])
+        };
         NFA::new(
             HashSet::from([init_state, accepted_state]),
-            HashMap::from([((init_state, c), accepted_state)]), 
+            table,
             init_state, 
             accepted_state
         )
