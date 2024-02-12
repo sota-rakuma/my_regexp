@@ -1,6 +1,6 @@
 use std::vec;
 
-use crate::{matcher::{executor::backtracer::BackTracer, nfa::builder::thompson::ThompsonWayBuilder, Matcher}, parser::ll0_parser::LL0Parser};
+use crate::{matcher::{executor::backtracker::BackTracer, nfa::builder::thompson::ThompsonWayBuilder, Matcher}, parser::ll0_parser::LL0Parser};
 
 use super::create_nfa;
 
